@@ -44,11 +44,10 @@ const fetchDriveFiles = async ({ apiKey, folderId }) => {
     q: `'${folderId}' in parents and trashed=false`,
     key: apiKey,
     fields: "files(id,name,mimeType,modifiedTime,size,iconLink)",
-    orderBy: "modifiedTime desc,name",
+    orderBy: "modifiedTime desc",
     includeItemsFromAllDrives: "true",
     supportsAllDrives: "true",
     corpora: "allDrives",
-    orderBy: "mimeType,modifiedTime desc",
   });
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files?${params.toString()}`
@@ -62,10 +61,6 @@ const fetchDriveFiles = async ({ apiKey, folderId }) => {
   if (!payload) {
     throw new Error("Drive API returned an empty response.");
   }
-  if (!response.ok) {
-    throw new Error(`Drive API error: ${response.status}`);
-  }
-  const payload = await response.json();
   return payload.files ?? [];
 };
 
@@ -90,14 +85,6 @@ const fetchDriveFolderInfo = async ({ apiKey, folderId }) => {
     throw new Error("Drive API returned an empty response while loading folder info.");
   }
   return payload;
-  const params = new URLSearchParams({ key: apiKey, fields: "id,name" });
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`
-  );
-  if (!response.ok) {
-    throw new Error(`Failed to fetch folder info: ${response.status}`);
-  }
-  return response.json();
 };
 
 const MathDriveBrowser = () => {
@@ -145,9 +132,6 @@ const MathDriveBrowser = () => {
               ? err.message
               : "We couldn't load the Mathematics Drive folder. Please verify the folder ID and API key.";
           setError(message);
-          setError(
-            "We couldn't load the Mathematics Drive folder. Please verify the folder ID and API key."
-          );
         }
       } finally {
         if (!cancelled) {
@@ -187,9 +171,6 @@ const MathDriveBrowser = () => {
               ? err.message
               : "Unable to fetch the latest files from Google Drive. Please try refreshing.";
           setError(message);
-          setError(
-            "Unable to fetch the latest files from Google Drive. Please try refreshing."
-          );
         }
       } finally {
         if (!cancelled) {
