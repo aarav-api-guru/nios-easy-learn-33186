@@ -44,11 +44,24 @@ const fetchDriveFiles = async ({ apiKey, folderId }) => {
     q: `'${folderId}' in parents and trashed=false`,
     key: apiKey,
     fields: "files(id,name,mimeType,modifiedTime,size,iconLink)",
+    orderBy: "modifiedTime desc,name",
+    includeItemsFromAllDrives: "true",
+    supportsAllDrives: "true",
+    corpora: "allDrives",
     orderBy: "mimeType,modifiedTime desc",
   });
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files?${params.toString()}`
   );
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.error?.message;
+    console.error("Drive API error payload", payload);
+    throw new Error(message ? `Drive API error: ${message}` : `Drive API error: ${response.status}`);
+  }
+  if (!payload) {
+    throw new Error("Drive API returned an empty response.");
+  }
   if (!response.ok) {
     throw new Error(`Drive API error: ${response.status}`);
   }
@@ -57,6 +70,26 @@ const fetchDriveFiles = async ({ apiKey, folderId }) => {
 };
 
 const fetchDriveFolderInfo = async ({ apiKey, folderId }) => {
+  const params = new URLSearchParams({
+    key: apiKey,
+    fields: "id,name",
+    supportsAllDrives: "true",
+  });
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`
+  );
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.error?.message;
+    console.error("Drive API folder info error", payload);
+    throw new Error(
+      message ? `Failed to fetch folder info: ${message}` : `Failed to fetch folder info: ${response.status}`
+    );
+  }
+  if (!payload) {
+    throw new Error("Drive API returned an empty response while loading folder info.");
+  }
+  return payload;
   const params = new URLSearchParams({ key: apiKey, fields: "id,name" });
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`
@@ -107,6 +140,11 @@ const MathDriveBrowser = () => {
       } catch (err) {
         console.error(err);
         if (!cancelled) {
+          const message =
+            err instanceof Error && err.message
+              ? err.message
+              : "We couldn't load the Mathematics Drive folder. Please verify the folder ID and API key.";
+          setError(message);
           setError(
             "We couldn't load the Mathematics Drive folder. Please verify the folder ID and API key."
           );
@@ -144,6 +182,11 @@ const MathDriveBrowser = () => {
       } catch (err) {
         console.error(err);
         if (!cancelled) {
+          const message =
+            err instanceof Error && err.message
+              ? err.message
+              : "Unable to fetch the latest files from Google Drive. Please try refreshing.";
+          setError(message);
           setError(
             "Unable to fetch the latest files from Google Drive. Please try refreshing."
           );
