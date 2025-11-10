@@ -50,6 +50,19 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## Google Drive configuration
+
+The Mathematics subject page now reads its resources directly from a Google Drive folder. To enable the integration locally you
+must provide two environment variables using a `.env` or `.env.local` file in the project root:
+
+```bash
+VITE_GOOGLE_API_KEY=<your-google-api-key>
+VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID=<drive-folder-id>
+```
+
+Restart the dev server after updating the environment file. When these values are set, refreshing the Mathematics page will pull
+the latest folder structure and files from Google Drive.
+
 ## What technologies are used for this project?
 
 This project is built with:
