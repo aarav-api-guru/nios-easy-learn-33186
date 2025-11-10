@@ -58,6 +58,8 @@ must provide two environment variables using a `.env` or `.env.local` file in th
 ```bash
 VITE_GOOGLE_API_KEY=<your-google-api-key>
 VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID=<drive-folder-id>
+# Only required when the folder lives in a shared drive
+VITE_GOOGLE_DRIVE_SHARED_DRIVE_ID=<shared-drive-id>
 ```
 
 Restart the dev server after updating the environment file. When these values are set, refreshing the Mathematics page will pull
