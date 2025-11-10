@@ -39,16 +39,20 @@ const formatDate = (dateString) => {
   }
 };
 
-const fetchDriveFiles = async ({ apiKey, folderId }) => {
+const fetchDriveFiles = async ({ apiKey, folderId, sharedDriveId }) => {
   const params = new URLSearchParams({
     q: `'${folderId}' in parents and trashed=false`,
     key: apiKey,
     fields: "files(id,name,mimeType,modifiedTime,size,iconLink)",
     orderBy: "modifiedTime desc",
-    includeItemsFromAllDrives: "true",
-    supportsAllDrives: "true",
-    corpora: "allDrives",
   });
+
+  if (sharedDriveId) {
+    params.set("driveId", sharedDriveId);
+    params.set("corpora", "drive");
+    params.set("supportsAllDrives", "true");
+    params.set("includeItemsFromAllDrives", "true");
+  }
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files?${params.toString()}`
   );
@@ -64,12 +68,15 @@ const fetchDriveFiles = async ({ apiKey, folderId }) => {
   return payload.files ?? [];
 };
 
-const fetchDriveFolderInfo = async ({ apiKey, folderId }) => {
+const fetchDriveFolderInfo = async ({ apiKey, folderId, sharedDriveId }) => {
   const params = new URLSearchParams({
     key: apiKey,
     fields: "id,name",
-    supportsAllDrives: "true",
   });
+
+  if (sharedDriveId) {
+    params.set("supportsAllDrives", "true");
+  }
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`
   );
@@ -90,6 +97,7 @@ const fetchDriveFolderInfo = async ({ apiKey, folderId }) => {
 const MathDriveBrowser = () => {
   const ROOT_FOLDER_ID = import.meta.env.VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID;
   const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+  const SHARED_DRIVE_ID = import.meta.env.VITE_GOOGLE_DRIVE_SHARED_DRIVE_ID;
 
   const [folderStack, setFolderStack] = useState([]);
   const [files, setFiles] = useState([]);
@@ -105,7 +113,7 @@ const MathDriveBrowser = () => {
   useEffect(() => {
     if (!ROOT_FOLDER_ID || !API_KEY) {
       setError(
-        "Missing Google Drive environment configuration. Please set VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID and VITE_GOOGLE_API_KEY."
+        "Missing Google Drive configuration. Set VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID and VITE_GOOGLE_API_KEY. If you are using a shared drive, also provide VITE_GOOGLE_DRIVE_SHARED_DRIVE_ID."
       );
       setInitializing(false);
       return;
@@ -119,6 +127,7 @@ const MathDriveBrowser = () => {
         const info = await fetchDriveFolderInfo({
           apiKey: API_KEY,
           folderId: ROOT_FOLDER_ID,
+          sharedDriveId: SHARED_DRIVE_ID,
         });
         if (!cancelled) {
           setFolderStack([{ id: info.id, name: info.name ?? "Mathematics" }]);
@@ -145,7 +154,7 @@ const MathDriveBrowser = () => {
     return () => {
       cancelled = true;
     };
-  }, [ROOT_FOLDER_ID, API_KEY]);
+  }, [ROOT_FOLDER_ID, API_KEY, SHARED_DRIVE_ID]);
 
   useEffect(() => {
     if (!currentFolderId || !API_KEY) return;
@@ -158,6 +167,7 @@ const MathDriveBrowser = () => {
         const driveFiles = await fetchDriveFiles({
           apiKey: API_KEY,
           folderId: currentFolderId,
+          sharedDriveId: SHARED_DRIVE_ID,
         });
         if (!cancelled) {
           setFiles(driveFiles);
@@ -184,7 +194,7 @@ const MathDriveBrowser = () => {
     return () => {
       cancelled = true;
     };
-  }, [API_KEY, currentFolderId, reloadToken]);
+  }, [API_KEY, SHARED_DRIVE_ID, currentFolderId, reloadToken]);
 
   const breadcrumbs = useMemo(() => {
     if (!folderStack.length) return [];
