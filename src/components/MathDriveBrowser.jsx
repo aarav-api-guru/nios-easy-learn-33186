@@ -44,19 +44,15 @@ const fetchDriveFiles = async ({ apiKey, folderId }) => {
     q: `'${folderId}' in parents and trashed=false`,
     key: apiKey,
     fields: "files(id,name,mimeType,modifiedTime,size,iconLink)",
-    orderBy: "modifiedTime desc,name",
+    orderBy: "mimeType,modifiedTime desc",
   });
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files?${params.toString()}`
   );
-  const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload?.error?.message;
-    throw new Error(message ? `Drive API error: ${message}` : `Drive API error: ${response.status}`);
+    throw new Error(`Drive API error: ${response.status}`);
   }
-  if (!payload) {
-    throw new Error("Drive API returned an empty response.");
-  }
+  const payload = await response.json();
   return payload.files ?? [];
 };
 
@@ -65,17 +61,10 @@ const fetchDriveFolderInfo = async ({ apiKey, folderId }) => {
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`
   );
-  const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload?.error?.message;
-    throw new Error(
-      message ? `Failed to fetch folder info: ${message}` : `Failed to fetch folder info: ${response.status}`
-    );
+    throw new Error(`Failed to fetch folder info: ${response.status}`);
   }
-  if (!payload) {
-    throw new Error("Drive API returned an empty response while loading folder info.");
-  }
-  return payload;
+  return response.json();
 };
 
 const MathDriveBrowser = () => {
@@ -118,11 +107,9 @@ const MathDriveBrowser = () => {
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          const message =
-            err instanceof Error && err.message
-              ? err.message
-              : "We couldn't load the Mathematics Drive folder. Please verify the folder ID and API key.";
-          setError(message);
+          setError(
+            "We couldn't load the Mathematics Drive folder. Please verify the folder ID and API key."
+          );
         }
       } finally {
         if (!cancelled) {
@@ -157,11 +144,9 @@ const MathDriveBrowser = () => {
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          const message =
-            err instanceof Error && err.message
-              ? err.message
-              : "Unable to fetch the latest files from Google Drive. Please try refreshing.";
-          setError(message);
+          setError(
+            "Unable to fetch the latest files from Google Drive. Please try refreshing."
+          );
         }
       } finally {
         if (!cancelled) {
