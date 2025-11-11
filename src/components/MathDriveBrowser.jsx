@@ -360,7 +360,7 @@ const MathDriveBrowser = () => {
   const splitFiles = useMemo(() => {
     const folders = [];
     const regularFiles = [];
-    for (const file of files) {
+    for (const file of filteredFiles) {
       if (file.mimeType === FOLDER_MIME) {
         folders.push(file);
       } else {
@@ -368,7 +368,7 @@ const MathDriveBrowser = () => {
       }
     }
     return { folders, regularFiles };
-  }, [files]);
+  }, [filteredFiles]);
 
   const filteredRegularFiles = useMemo(() => {
     const query = fileSearchQuery.trim().toLowerCase();
@@ -641,7 +641,7 @@ const MathDriveBrowser = () => {
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 
