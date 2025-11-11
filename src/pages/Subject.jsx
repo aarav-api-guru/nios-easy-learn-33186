@@ -49,32 +49,48 @@ const Subject = () => {
 
               {/* Chapters Grid */}
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredChapters.length > 0 ? (filteredChapters.map((chapter) => (<Link key={chapter.id} to={`/${subjectId}/chapter/${chapter.id}`}>
-                    <Card className="h-full hover:shadow-lg transition-all hover:scale-105 border-2 hover:border-primary cursor-pointer">
-                      <CardHeader>
-                        <div className="flex items-start justify-between mb-2">
-                          <Badge variant="secondary" className="text-sm">
-                            Chapter {chapter.chapterNumber}
-                          </Badge>
-                          <Badge variant="outline" className="gap-1">
-                            <FileText className="h-3 w-3"/>
-                            {chapter.resourceCount}
-                          </Badge>
-                        </div>
-                        <CardTitle className="text-xl">{chapter.name}</CardTitle>
-                        <CardDescription>{chapter.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-muted-foreground">
-                          Click to view resources and materials
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </Link>))) : (<div className="col-span-full text-center py-12">
+                {filteredChapters.length > 0 ? (
+                  filteredChapters.map((chapter, index) => {
+                    const chapterIndex = chapter.chapterNumber ?? index + 1;
+                    const formattedNumber = String(chapterIndex).padStart(2, '0');
+
+                    return (
+                      <Link key={chapter.id} to={`/${subjectId}/chapter/${chapter.id}`}>
+                        <Card className="group h-full border-2 border-border bg-card/80 shadow-sm transition-all hover:-translate-y-1 hover:border-primary hover:shadow-lg">
+                          <CardHeader>
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-lg font-bold text-primary">
+                                  {formattedNumber}
+                                </div>
+                                <Badge variant="secondary" className="text-sm">
+                                  Chapter {chapterIndex}
+                                </Badge>
+                              </div>
+                              <Badge variant="outline" className="gap-1">
+                                <FileText className="h-3 w-3"/>
+                                {chapter.resourceCount}
+                              </Badge>
+                            </div>
+                            <CardTitle className="text-xl group-hover:text-primary transition-colors">{chapter.name}</CardTitle>
+                            <CardDescription>{chapter.description}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-muted-foreground">
+                              Click to view resources and materials
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center py-12">
                     <p className="text-muted-foreground text-lg">
                       No chapters found matching "{searchQuery}"
                     </p>
-                  </div>)}
+                  </div>
+                )}
               </div>
             </>
           )}
