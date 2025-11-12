@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Download,
   File,
-  FolderOpen,
   Loader2,
   RefreshCcw,
   Search,
@@ -16,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
@@ -53,7 +51,7 @@ const fetchDriveFiles = async ({ apiKey, folderId, sharedDriveId }) => {
   const params = new URLSearchParams({
     q: `'${folderId}' in parents and trashed=false`,
     key: apiKey,
-    fields: "files(id,name,mimeType,modifiedTime,size,iconLink)",
+    fields: "files(id,name,mimeType,modifiedTime,size,iconLink,description,properties)",
     orderBy: "modifiedTime desc",
   });
 
@@ -76,6 +74,91 @@ const fetchDriveFiles = async ({ apiKey, folderId, sharedDriveId }) => {
     throw new Error("Drive API returned an empty response.");
   }
   return payload.files ?? [];
+};
+
+const fetchFolderFileCount = async ({ apiKey, folderId, sharedDriveId }) => {
+  const params = new URLSearchParams({
+    q: `'${folderId}' in parents and trashed=false`,
+    key: apiKey,
+    fields: "files(id)",
+    pageSize: "1000",
+  });
+
+  if (sharedDriveId) {
+    params.set("driveId", sharedDriveId);
+    params.set("corpora", "drive");
+    params.set("supportsAllDrives", "true");
+    params.set("includeItemsFromAllDrives", "true");
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files?${params.toString()}`
+  );
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = payload?.error?.message;
+    console.error("Drive API folder count error", payload);
+    throw new Error(
+      message ? `Unable to fetch folder details: ${message}` : `Unable to fetch folder details: ${response.status}`
+    );
+  }
+
+  if (!payload) {
+    throw new Error("Drive API returned an empty response while loading folder details.");
+  }
+
+  return payload.files?.length ?? 0;
+};
+
+const getFolderMetadata = (name, description, fallbackChapter) => {
+  const cleanedName = name?.trim() ?? "Untitled";
+  const cleanedDescription = description?.trim() ?? "";
+
+  const segments = cleanedName
+    .split(/[\-|–|:]/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  let chapterLabel = fallbackChapter ?? null;
+  let title = cleanedName;
+  let subtitle = cleanedDescription;
+
+  if (segments.length) {
+    const [firstSegment, ...rest] = segments;
+    const chapterMatch = firstSegment.match(/chapter\s*(\d+)/i);
+
+    if (chapterMatch) {
+      chapterLabel = `Chapter ${chapterMatch[1]}`;
+      if (rest.length) {
+        title = rest[0];
+        if (rest.length > 1) {
+          subtitle = rest.slice(1).join(" – ");
+        }
+      } else if (cleanedDescription) {
+        title = cleanedName.replace(firstSegment, "").replace(/^[\s\-|–:]+/, "").trim() || cleanedName;
+      }
+    } else {
+      title = cleanedName;
+    }
+  }
+
+  if (!subtitle && cleanedDescription) {
+    subtitle = cleanedDescription;
+  }
+
+  if (!chapterLabel) {
+    const looseChapterMatch = cleanedName.match(/chapter\s*(\d+)/i);
+    if (looseChapterMatch) {
+      chapterLabel = `Chapter ${looseChapterMatch[1]}`;
+    }
+  }
+
+  return {
+    chapterLabel: chapterLabel ?? fallbackChapter,
+    title,
+    subtitle,
+  };
 };
 
 const fetchDriveFolderInfo = async ({ apiKey, folderId, sharedDriveId }) => {
@@ -117,6 +200,7 @@ const MathDriveBrowser = () => {
   const [previewFile, setPreviewFile] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
   const [fileSearchQuery, setFileSearchQuery] = useState("");
+  const [folderCounts, setFolderCounts] = useState({});
 
   const currentFolder = folderStack[folderStack.length - 1];
   const currentFolderId = currentFolder?.id;
@@ -257,6 +341,47 @@ const MathDriveBrowser = () => {
     return { folders, regularFiles };
   }, [filteredFiles]);
 
+  useEffect(() => {
+    if (!API_KEY || !splitFiles.folders.length) return;
+
+    let cancelled = false;
+
+    const loadCounts = async () => {
+      const foldersToFetch = splitFiles.folders.filter((folder) => folderCounts[folder.id] == null);
+      if (!foldersToFetch.length) return;
+
+      const updates = {};
+
+      for (const folder of foldersToFetch) {
+        try {
+          const count = await fetchFolderFileCount({
+            apiKey: API_KEY,
+            folderId: folder.id,
+            sharedDriveId: SHARED_DRIVE_ID,
+          });
+          if (!cancelled) {
+            updates[folder.id] = count;
+          }
+        } catch (err) {
+          console.error(err);
+          if (!cancelled) {
+            updates[folder.id] = 0;
+          }
+        }
+      }
+
+      if (!cancelled && Object.keys(updates).length) {
+        setFolderCounts((prev) => ({ ...prev, ...updates }));
+      }
+    };
+
+    loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [API_KEY, SHARED_DRIVE_ID, splitFiles.folders, folderCounts]);
+
   if (initializing) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -275,7 +400,7 @@ const MathDriveBrowser = () => {
   }
 
   return (
-    <Card className="space-y-6 border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background shadow-sm">
+    <Card className="space-y-6 border-none bg-transparent shadow-none">
       <CardHeader className="gap-4 pb-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -338,27 +463,15 @@ const MathDriveBrowser = () => {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="flex flex-col gap-4 rounded-2xl border border-primary/20 bg-card/70 p-4 shadow-inner">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-              <Badge variant="outline" className="gap-2 border-primary/40 bg-primary/5 text-primary">
-                <FolderOpen className="h-4 w-4" aria-hidden />
-                {splitFiles.folders.length} folders
-              </Badge>
-              <Badge variant="outline" className="gap-2 border-border bg-background text-muted-foreground">
-                <File className="h-4 w-4" aria-hidden />
-                {splitFiles.regularFiles.length} files
-              </Badge>
-            </div>
-            <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={fileSearchQuery}
-                onChange={(event) => setFileSearchQuery(event.target.value)}
-                placeholder="Search files and folders"
-                className="h-10 rounded-full border-primary/30 bg-background pl-9 text-sm"
-              />
-            </div>
+        <div className="flex flex-col gap-6">
+          <div className="relative w-full max-w-xl">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={fileSearchQuery}
+              onChange={(event) => setFileSearchQuery(event.target.value)}
+              placeholder="Search chapters by name or number…"
+              className="h-12 w-full rounded-full border border-muted-foreground/20 bg-background pl-11 text-sm shadow-sm"
+            />
           </div>
 
           {loading ? (
@@ -371,59 +484,88 @@ const MathDriveBrowser = () => {
               {fileSearchQuery ? "No files match your search." : "This folder is empty."}
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {[...splitFiles.folders, ...splitFiles.regularFiles].map((file) => (
-                <div key={file.id}>
-                  {file.mimeType === FOLDER_MIME ? (
-                    <button
-                      type="button"
-                      onClick={() => handleFolderClick({ id: file.id, name: file.name })}
-                      className="group flex w-full flex-col gap-3 rounded-2xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 via-primary/5 to-background p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/60 hover:shadow-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-xl bg-primary/20 p-3 text-primary">
-                          <FolderOpen className="h-5 w-5" aria-hidden />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-primary group-hover:text-primary/80">
-                            {file.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Updated {formatDate(file.modifiedTime)}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setPreviewFile(file)}
-                      className="group flex w-full flex-col gap-3 rounded-2xl border-2 border-border bg-gradient-to-br from-muted/40 via-background to-background p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="rounded-xl bg-muted p-3 text-muted-foreground">
-                          <File className="h-5 w-5" aria-hidden />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-foreground group-hover:text-primary">
-                            {file.name}
-                          </p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            {formatDate(file.modifiedTime) && (
-                              <span>Updated {formatDate(file.modifiedTime)}</span>
-                            )}
-                            {formatSize(file.size) && (
-                              <span className="rounded-full bg-muted px-2 py-0.5">
-                                {formatSize(file.size)}
-                              </span>
-                            )}
+            <div className="space-y-8">
+              {splitFiles.folders.length > 0 && (
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {splitFiles.folders.map((folder, index) => {
+                    const metadata = getFolderMetadata(
+                      folder.name,
+                      folder.description,
+                      `Chapter ${index + 1}`
+                    );
+
+                    const fileCount = folderCounts[folder.id];
+
+                    return (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        onClick={() => handleFolderClick({ id: folder.id, name: folder.name })}
+                        className="group flex h-full w-full flex-col rounded-3xl border border-emerald-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1.5 hover:shadow-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="inline-flex items-center gap-3 rounded-full bg-emerald-100 px-4 py-1 text-xs font-semibold text-emerald-700">
+                            <span>{metadata.chapterLabel}</span>
+                            <span className="flex items-center gap-1 rounded-full bg-emerald-200/60 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                              <File className="h-3.5 w-3.5" aria-hidden />
+                              {fileCount == null ? "…" : fileCount}
+                            </span>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  )}
+                        <div className="mt-6 space-y-2">
+                          <p className="text-lg font-semibold text-foreground group-hover:text-primary">
+                            {metadata.title || folder.name}
+                          </p>
+                          {metadata.subtitle && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {metadata.subtitle}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
+
+              {splitFiles.regularFiles.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Files
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {splitFiles.regularFiles.map((file) => (
+                      <button
+                        key={file.id}
+                        type="button"
+                        onClick={() => setPreviewFile(file)}
+                        className="group flex w-full flex-col gap-3 rounded-2xl border border-muted-foreground/10 bg-card p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="rounded-xl bg-muted p-3 text-muted-foreground">
+                            <File className="h-5 w-5" aria-hidden />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-foreground group-hover:text-primary">
+                              {file.name}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              {formatDate(file.modifiedTime) && (
+                                <span>Updated {formatDate(file.modifiedTime)}</span>
+                              )}
+                              {formatSize(file.size) && (
+                                <span className="rounded-full bg-muted px-2 py-0.5">
+                                  {formatSize(file.size)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
