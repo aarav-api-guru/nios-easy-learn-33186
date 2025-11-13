@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import CommentsPanel from "@/components/CommentsPanel";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
@@ -400,7 +401,8 @@ const MathDriveBrowser = () => {
   }
 
   return (
-    <Card className="space-y-6 border-none bg-transparent shadow-none">
+    <div className="space-y-6">
+      <Card className="space-y-6 border-none bg-transparent shadow-none">
       <CardHeader className="gap-4 pb-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -462,7 +464,7 @@ const MathDriveBrowser = () => {
         )}
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-10">
         <div className="flex flex-col gap-6">
           <div className="relative w-full max-w-xl">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -569,6 +571,8 @@ const MathDriveBrowser = () => {
             </div>
           )}
         </div>
+
+        <CommentsPanel embedded className="bg-background/70" />
       </CardContent>
 
       {previewFile && (
@@ -610,9 +614,10 @@ const MathDriveBrowser = () => {
             </div>
           </div>
         </div>
-      )}
-    </Card>
-  );
-};
+        )}
+        </Card>
+      </div>
+    );
+  };
 
 export default MathDriveBrowser;
