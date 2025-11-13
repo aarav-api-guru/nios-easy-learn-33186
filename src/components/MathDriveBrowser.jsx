@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import CommentsPanel from "@/components/CommentsPanel";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
@@ -161,10 +162,32 @@ const getFolderMetadata = (name, description, fallbackChapter) => {
   };
 };
 
+const deriveModuleTitle = (folder) => {
+  if (!folder) {
+    return "Mathematics";
+  }
+
+  if (typeof folder === "object" && folder?.moduleTitle) {
+    return folder.moduleTitle;
+  }
+
+  const rawName = typeof folder === "string" ? folder : folder?.name;
+  const description = typeof folder === "object" ? folder?.description : undefined;
+
+  const metadata = getFolderMetadata(rawName, description);
+  const normalizedTitle = metadata.title?.trim();
+
+  if (normalizedTitle) {
+    return normalizedTitle;
+  }
+
+  return rawName?.trim() || "Mathematics";
+};
+
 const fetchDriveFolderInfo = async ({ apiKey, folderId, sharedDriveId }) => {
   const params = new URLSearchParams({
     key: apiKey,
-    fields: "id,name",
+    fields: "id,name,description",
   });
 
   if (sharedDriveId) {
@@ -204,6 +227,7 @@ const MathDriveBrowser = () => {
 
   const currentFolder = folderStack[folderStack.length - 1];
   const currentFolderId = currentFolder?.id;
+  const currentModuleTitle = currentFolder?.moduleTitle || deriveModuleTitle(currentFolder);
 
   useEffect(() => {
     if (!ROOT_FOLDER_ID || !API_KEY) {
@@ -225,7 +249,17 @@ const MathDriveBrowser = () => {
           sharedDriveId: SHARED_DRIVE_ID,
         });
         if (!cancelled) {
-          setFolderStack([{ id: info.id, name: info.name ?? "Mathematics" }]);
+          setFolderStack([
+            {
+              id: info.id,
+              name: info.name ?? "Mathematics",
+              description: info.description,
+              moduleTitle: deriveModuleTitle({
+                name: info?.name ?? "Mathematics",
+                description: info?.description,
+              }),
+            },
+          ]);
           setError(null);
         }
       } catch (err) {
@@ -300,7 +334,15 @@ const MathDriveBrowser = () => {
   }, [folderStack]);
 
   const handleFolderClick = (folder) => {
-    setFolderStack((prev) => [...prev, folder]);
+    setFolderStack((prev) => [
+      ...prev,
+      {
+        id: folder.id,
+        name: folder.name,
+        description: folder.description,
+        moduleTitle: deriveModuleTitle(folder),
+      },
+    ]);
   };
 
   const handleBreadcrumbClick = (index) => {
@@ -400,218 +442,231 @@ const MathDriveBrowser = () => {
   }
 
   return (
-    <Card className="space-y-6 border-none bg-transparent shadow-none">
-      <CardHeader className="gap-4 pb-0">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <CardTitle className="text-2xl font-semibold text-foreground">
-              Mathematics Resources
-            </CardTitle>
-            <CardDescription>
-              Browse files directly from the connected Google Drive folder.
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {folderStack.length > 1 && (
+    <div className="space-y-6">
+      <Card className="space-y-6 border-none bg-transparent shadow-none">
+        <CardHeader className="gap-4 pb-0">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-2xl font-semibold text-foreground">
+                Mathematics Resources
+              </CardTitle>
+              <CardDescription>
+                Browse files directly from the connected Google Drive folder.
+              </CardDescription>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {folderStack.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleBack}
+                  className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                  Back
+                </button>
+              )}
               <button
                 type="button"
-                onClick={handleBack}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                onClick={handleRefresh}
+                className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition hover:border-primary hover:bg-primary/20"
               >
-                <ArrowLeft className="h-4 w-4" aria-hidden />
-                Back
+                <RefreshCcw className="h-4 w-4" aria-hidden />
+                Refresh
               </button>
-            )}
-            <button
-              type="button"
-              onClick={handleRefresh}
-              className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition hover:border-primary hover:bg-primary/20"
-            >
-              <RefreshCcw className="h-4 w-4" aria-hidden />
-              Refresh
-            </button>
-          </div>
-        </div>
-
-        {breadcrumbs.length > 0 && (
-          <nav className="flex flex-wrap items-center gap-2 text-sm">
-            {breadcrumbs.map((crumb, index) => (
-              <div key={crumb.id} className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleBreadcrumbClick(index)}
-                  disabled={crumb.isLast}
-                  className={`rounded-full px-3 py-1 text-xs font-medium transition ${
-                    crumb.isLast
-                      ? "cursor-default bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:bg-muted/70"
-                  }`}
-                >
-                  {crumb.name || "Unnamed"}
-                </button>
-                {!crumb.isLast && <span className="text-muted-foreground">/</span>}
-              </div>
-            ))}
-          </nav>
-        )}
-
-        {error && (
-          <div className="w-full rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-      </CardHeader>
-
-      <CardContent className="space-y-6">
-        <div className="flex flex-col gap-6">
-          <div className="relative w-full max-w-xl">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={fileSearchQuery}
-              onChange={(event) => setFileSearchQuery(event.target.value)}
-              placeholder="Search chapters by name or number…"
-              className="h-12 w-full rounded-full border border-muted-foreground/20 bg-background pl-11 text-sm shadow-sm"
-            />
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
-              <span>Loading files…</span>
             </div>
-          ) : filteredFiles.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">
-              {fileSearchQuery ? "No files match your search." : "This folder is empty."}
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {splitFiles.folders.length > 0 && (
-                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {splitFiles.folders.map((folder, index) => {
-                    const metadata = getFolderMetadata(
-                      folder.name,
-                      folder.description,
-                      `Chapter ${index + 1}`
-                    );
+          </div>
 
-                    const fileCount = folderCounts[folder.id];
-
-                    return (
-                      <button
-                        key={folder.id}
-                        type="button"
-                        onClick={() => handleFolderClick({ id: folder.id, name: folder.name })}
-                        className="group flex h-full w-full flex-col rounded-3xl border border-emerald-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1.5 hover:shadow-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="inline-flex items-center gap-3 rounded-full bg-emerald-100 px-4 py-1 text-xs font-semibold text-emerald-700">
-                            <span>{metadata.chapterLabel}</span>
-                            <span className="flex items-center gap-1 rounded-full bg-emerald-200/60 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                              <File className="h-3.5 w-3.5" aria-hidden />
-                              {fileCount == null ? "…" : fileCount}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-6 space-y-2">
-                          <p className="text-lg font-semibold text-foreground group-hover:text-primary">
-                            {metadata.title || folder.name}
-                          </p>
-                          {metadata.subtitle && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {metadata.subtitle}
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
+          {breadcrumbs.length > 0 && (
+            <nav className="flex flex-wrap items-center gap-2 text-sm">
+              {breadcrumbs.map((crumb, index) => (
+                <div key={crumb.id} className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBreadcrumbClick(index)}
+                    disabled={crumb.isLast}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                      crumb.isLast
+                        ? "cursor-default bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/70"
+                    }`}
+                  >
+                    {crumb.name || "Unnamed"}
+                  </button>
+                  {!crumb.isLast && <span className="text-muted-foreground">/</span>}
                 </div>
-              )}
+              ))}
+            </nav>
+          )}
 
-              {splitFiles.regularFiles.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Files
-                  </h3>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {splitFiles.regularFiles.map((file) => (
-                      <button
-                        key={file.id}
-                        type="button"
-                        onClick={() => setPreviewFile(file)}
-                        className="group flex w-full flex-col gap-3 rounded-2xl border border-muted-foreground/10 bg-card p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-xl bg-muted p-3 text-muted-foreground">
-                            <File className="h-5 w-5" aria-hidden />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-foreground group-hover:text-primary">
-                              {file.name}
-                            </p>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                              {formatDate(file.modifiedTime) && (
-                                <span>Updated {formatDate(file.modifiedTime)}</span>
-                              )}
-                              {formatSize(file.size) && (
-                                <span className="rounded-full bg-muted px-2 py-0.5">
-                                  {formatSize(file.size)}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {error && (
+            <div className="w-full rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {error}
             </div>
           )}
-        </div>
-      </CardContent>
+        </CardHeader>
 
-      {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-background shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <div>
-                <h3 className="text-lg font-semibold text-foreground">
-                  {previewFile.name}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Last updated {formatDate(previewFile.modifiedTime)}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <a
-                  href={getDownloadUrl(previewFile.id)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
-                >
-                  <Download className="h-4 w-4" aria-hidden /> Download
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setPreviewFile(null)}
-                  className="rounded-full p-2 text-muted-foreground transition hover:bg-muted"
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              </div>
-            </div>
-
-            <div className="aspect-video w-full">
-              <iframe
-                src={getPreviewUrl(previewFile.id)}
-                title={previewFile.name}
-                className="h-full w-full"
-                allow="autoplay"
+        <CardContent className="space-y-10">
+          <div className="flex flex-col gap-6">
+            <div className="relative w-full max-w-xl">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={fileSearchQuery}
+                onChange={(event) => setFileSearchQuery(event.target.value)}
+                placeholder="Search chapters by name or number…"
+                className="h-12 w-full rounded-full border border-muted-foreground/20 bg-background pl-11 text-sm shadow-sm"
               />
             </div>
+
+            {loading ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
+                <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
+                <span>Loading files…</span>
+              </div>
+            ) : filteredFiles.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                {fileSearchQuery ? "No files match your search." : "This folder is empty."}
+              </div>
+            ) : (
+              <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+                <div className="space-y-8">
+                  {splitFiles.folders.length > 0 && (
+                    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                      {splitFiles.folders.map((folder, index) => {
+                        const metadata = getFolderMetadata(
+                          folder.name,
+                          folder.description,
+                          `Chapter ${index + 1}`
+                        );
+
+                        const fileCount = folderCounts[folder.id];
+
+                        return (
+                          <button
+                            key={folder.id}
+                            type="button"
+                            onClick={() => handleFolderClick(folder)}
+                            className="group flex h-full w-full flex-col rounded-3xl border border-emerald-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1.5 hover:shadow-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="inline-flex items-center gap-3 rounded-full bg-emerald-100 px-4 py-1 text-xs font-semibold text-emerald-700">
+                                <span>{metadata.chapterLabel}</span>
+                                <span className="flex items-center gap-1 rounded-full bg-emerald-200/60 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                                  <File className="h-3.5 w-3.5" aria-hidden />
+                                  {fileCount == null ? "…" : fileCount}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="mt-6 space-y-2">
+                              <p className="text-lg font-semibold text-foreground group-hover:text-primary">
+                                {metadata.title || folder.name}
+                              </p>
+                              {metadata.subtitle && (
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  {metadata.subtitle}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {splitFiles.regularFiles.length > 0 && (
+                    <div className="space-y-4">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Files
+                      </h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {splitFiles.regularFiles.map((file) => (
+                          <button
+                            key={file.id}
+                            type="button"
+                            onClick={() => setPreviewFile(file)}
+                            className="group flex w-full flex-col gap-3 rounded-2xl border border-muted-foreground/10 bg-card p-5 text-left shadow-sm transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="rounded-xl bg-muted p-3 text-muted-foreground">
+                                <File className="h-5 w-5" aria-hidden />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="font-semibold text-foreground group-hover:text-primary">
+                                  {file.name}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {formatDate(file.modifiedTime) && (
+                                    <span>Updated {formatDate(file.modifiedTime)}</span>
+                                  )}
+                                  {formatSize(file.size) && (
+                                    <span className="rounded-full bg-muted px-2 py-0.5">
+                                      {formatSize(file.size)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <CommentsPanel
+                  key={currentFolder?.id ?? "root"}
+                  embedded
+                  className="h-full bg-background/70"
+                  module={currentModuleTitle}
+                  title={`${currentModuleTitle} Discussion`}
+                  description={`Ask questions or share your thoughts about ${currentModuleTitle}.`}
+                />
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </Card>
+        </CardContent>
+
+        {previewFile && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-background shadow-2xl">
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {previewFile.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Last updated {formatDate(previewFile.modifiedTime)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={getDownloadUrl(previewFile.id)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+                  >
+                    <Download className="h-4 w-4" aria-hidden /> Download
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewFile(null)}
+                    className="rounded-full p-2 text-muted-foreground transition hover:bg-muted"
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+              </div>
+
+              <div className="aspect-video w-full">
+                <iframe
+                  src={getPreviewUrl(previewFile.id)}
+                  title={previewFile.name}
+                  className="h-full w-full"
+                  allow="autoplay"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
   );
 };
 
