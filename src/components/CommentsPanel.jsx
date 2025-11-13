@@ -28,6 +28,8 @@ const formatTimestamp = (value) => {
 const CommentsPanel = ({
   title = "Comments & Discussion",
   description = "Ask questions or share your thoughts",
+  embedded = false,
+  className,
 }) => {
   const { toast } = useToast();
   const [comments, setComments] = useState([]);
