@@ -464,7 +464,7 @@ const MathDriveBrowser = () => {
         )}
       </CardHeader>
 
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-10">
         <div className="flex flex-col gap-6">
           <div className="relative w-full max-w-xl">
             <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -571,6 +571,8 @@ const MathDriveBrowser = () => {
             </div>
           )}
         </div>
+
+        <CommentsPanel embedded className="bg-background/70" />
       </CardContent>
 
       {previewFile && (
@@ -612,12 +614,10 @@ const MathDriveBrowser = () => {
             </div>
           </div>
         </div>
-      )}
-      </Card>
-
-      <CommentsPanel />
-    </div>
-  );
-};
+        )}
+        </Card>
+      </div>
+    );
+  };
 
 export default MathDriveBrowser;
