@@ -162,10 +162,32 @@ const getFolderMetadata = (name, description, fallbackChapter) => {
   };
 };
 
+const deriveModuleTitle = (folder) => {
+  if (!folder) {
+    return "Mathematics";
+  }
+
+  if (typeof folder === "object" && folder?.moduleTitle) {
+    return folder.moduleTitle;
+  }
+
+  const rawName = typeof folder === "string" ? folder : folder?.name;
+  const description = typeof folder === "object" ? folder?.description : undefined;
+
+  const metadata = getFolderMetadata(rawName, description);
+  const normalizedTitle = metadata.title?.trim();
+
+  if (normalizedTitle) {
+    return normalizedTitle;
+  }
+
+  return rawName?.trim() || "Mathematics";
+};
+
 const fetchDriveFolderInfo = async ({ apiKey, folderId, sharedDriveId }) => {
   const params = new URLSearchParams({
     key: apiKey,
-    fields: "id,name",
+    fields: "id,name,description",
   });
 
   if (sharedDriveId) {
@@ -205,7 +227,7 @@ const MathDriveBrowser = () => {
 
   const currentFolder = folderStack[folderStack.length - 1];
   const currentFolderId = currentFolder?.id;
-  const currentModuleName = currentFolder?.name?.trim() || "Mathematics";
+  const currentModuleTitle = currentFolder?.moduleTitle || deriveModuleTitle(currentFolder);
 
   useEffect(() => {
     if (!ROOT_FOLDER_ID || !API_KEY) {
@@ -227,7 +249,17 @@ const MathDriveBrowser = () => {
           sharedDriveId: SHARED_DRIVE_ID,
         });
         if (!cancelled) {
-          setFolderStack([{ id: info.id, name: info.name ?? "Mathematics" }]);
+          setFolderStack([
+            {
+              id: info.id,
+              name: info.name ?? "Mathematics",
+              description: info.description,
+              moduleTitle: deriveModuleTitle({
+                name: info?.name ?? "Mathematics",
+                description: info?.description,
+              }),
+            },
+          ]);
           setError(null);
         }
       } catch (err) {
@@ -302,7 +334,15 @@ const MathDriveBrowser = () => {
   }, [folderStack]);
 
   const handleFolderClick = (folder) => {
-    setFolderStack((prev) => [...prev, folder]);
+    setFolderStack((prev) => [
+      ...prev,
+      {
+        id: folder.id,
+        name: folder.name,
+        description: folder.description,
+        moduleTitle: deriveModuleTitle(folder),
+      },
+    ]);
   };
 
   const handleBreadcrumbClick = (index) => {
@@ -504,7 +544,7 @@ const MathDriveBrowser = () => {
                           <button
                             key={folder.id}
                             type="button"
-                            onClick={() => handleFolderClick({ id: folder.id, name: folder.name })}
+                            onClick={() => handleFolderClick(folder)}
                             className="group flex h-full w-full flex-col rounded-3xl border border-emerald-100 bg-white p-6 text-left shadow-sm transition hover:-translate-y-1.5 hover:shadow-lg"
                           >
                             <div className="flex items-center gap-3">
@@ -576,9 +616,9 @@ const MathDriveBrowser = () => {
                   key={currentFolder?.id ?? "root"}
                   embedded
                   className="h-full bg-background/70"
-                  module={currentModuleName}
-                  title={`${currentModuleName} Discussion`}
-                  description="Ask questions or share your thoughts about this folder."
+                  module={currentModuleTitle}
+                  title={`${currentModuleTitle} Discussion`}
+                  description={`Ask questions or share your thoughts about ${currentModuleTitle}.`}
                 />
               </div>
             )}
@@ -624,11 +664,10 @@ const MathDriveBrowser = () => {
               </div>
             </div>
           </div>
-        </div>
         )}
-        </Card>
-      </div>
-    );
-  };
+      </Card>
+    </div>
+  );
+};
 
 export default MathDriveBrowser;

@@ -29,6 +29,7 @@ const CommentsPanel = ({
   title = "Comments & Discussion",
   description = "Ask questions or share your thoughts",
   embedded = false,
+  module,
   className,
 }) => {
   const { toast } = useToast();
@@ -39,6 +40,7 @@ const CommentsPanel = ({
   const [error, setError] = useState(null);
 
   const normalizedModule = module?.trim() || "";
+  const normalizedModuleLower = normalizedModule.toLowerCase();
 
   const commentsEndpoint = useMemo(() => {
     const base = (import.meta.env.VITE_COMMENTS_API_URL || "http://localhost:3000").replace(/\/$/, "");
@@ -71,9 +73,13 @@ const CommentsPanel = ({
 
       const items = Array.isArray(payload) ? payload : [];
       const filteredItems = normalizedModule
-        ? items.filter(
-            (item) => (item?.module ?? item?.Module ?? "").trim().toLowerCase() === normalizedModule.toLowerCase()
-          )
+        ? items.filter((item) => {
+            const moduleValue = (item?.module ?? item?.Module ?? "")
+              .toString()
+              .trim()
+              .toLowerCase();
+            return moduleValue === normalizedModuleLower;
+          })
         : items;
 
       setComments(filteredItems);
@@ -88,7 +94,7 @@ const CommentsPanel = ({
     } finally {
       setIsLoading(false);
     }
-  }, [commentsEndpoint]);
+  }, [commentsEndpoint, normalizedModule, normalizedModuleLower]);
 
   useEffect(() => {
     fetchComments();
@@ -121,7 +127,7 @@ const CommentsPanel = ({
         user_id: Math.floor(100000 + Math.random() * 900000),
         user_name: trimmedName,
         comment: trimmedComment,
-        ...(normalizedModule ? { module: normalizedModule } : {}),
+        module: normalizedModule || null,
       };
 
       const response = await fetch(commentsEndpoint, {
@@ -141,9 +147,19 @@ const CommentsPanel = ({
         throw new Error(message);
       }
 
-      setComments((prev) => [savedComment, ...prev]);
+      const savedModuleValue = (savedComment?.module ?? savedComment?.Module ?? "")
+        .toString()
+        .trim()
+        .toLowerCase();
+
       setFormData({ name: "", comment: "" });
       setError(null);
+
+      if (normalizedModule && savedModuleValue !== normalizedModuleLower) {
+        await fetchComments();
+      } else {
+        setComments((prev) => [savedComment, ...prev]);
+      }
 
       toast({
         title: "Comment posted!",
