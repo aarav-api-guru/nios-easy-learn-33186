@@ -570,8 +570,25 @@ const MathDriveBrowser = () => {
                     </div>
                   )}
                 </div>
+              )}
+            </div>
+          )}
+        </div>
 
-                <CommentsPanel embedded className="h-full bg-background/70" />
+        <CommentsPanel embedded className="bg-background/70" />
+      </CardContent>
+
+      {previewFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="relative w-full max-w-3xl overflow-hidden rounded-2xl bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">
+                  {previewFile.name}
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Last updated {formatDate(previewFile.modifiedTime)}
+                </p>
               </div>
             )}
           </div>
@@ -616,10 +633,11 @@ const MathDriveBrowser = () => {
               </div>
             </div>
           </div>
+        </div>
         )}
-      </Card>
-    </div>
-  );
-};
+        </Card>
+      </div>
+    );
+  };
 
 export default MathDriveBrowser;
