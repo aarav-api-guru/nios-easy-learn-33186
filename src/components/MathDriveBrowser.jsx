@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import CommentsPanel from "@/components/CommentsPanel";
 
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
@@ -400,7 +401,8 @@ const MathDriveBrowser = () => {
   }
 
   return (
-    <Card className="space-y-6 border-none bg-transparent shadow-none">
+    <div className="space-y-6">
+      <Card className="space-y-6 border-none bg-transparent shadow-none">
       <CardHeader className="gap-4 pb-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -611,7 +613,10 @@ const MathDriveBrowser = () => {
           </div>
         </div>
       )}
-    </Card>
+      </Card>
+
+      <CommentsPanel />
+    </div>
   );
 };
 
