@@ -38,10 +38,23 @@ const CommentsPanel = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  const normalizedModule = module?.trim() || "";
+
   const commentsEndpoint = useMemo(() => {
     const base = (import.meta.env.VITE_COMMENTS_API_URL || "http://localhost:3000").replace(/\/$/, "");
-    return `${base}/comments`;
-  }, []);
+    const url = new URL(`${base}/comments`);
+
+    if (normalizedModule) {
+      url.searchParams.set("module", normalizedModule);
+    }
+
+    return url.toString();
+  }, [normalizedModule]);
+
+  useEffect(() => {
+    setComments([]);
+    setError(null);
+  }, [normalizedModule]);
 
   const fetchComments = useCallback(async () => {
     setIsLoading(true);
@@ -56,7 +69,14 @@ const CommentsPanel = ({
         throw new Error(message);
       }
 
-      setComments(Array.isArray(payload) ? payload : []);
+      const items = Array.isArray(payload) ? payload : [];
+      const filteredItems = normalizedModule
+        ? items.filter(
+            (item) => (item?.module ?? item?.Module ?? "").trim().toLowerCase() === normalizedModule.toLowerCase()
+          )
+        : items;
+
+      setComments(filteredItems);
       setError(null);
     } catch (fetchError) {
       console.error("Failed to load comments", fetchError);
@@ -101,6 +121,7 @@ const CommentsPanel = ({
         user_id: Math.floor(100000 + Math.random() * 900000),
         user_name: trimmedName,
         comment: trimmedComment,
+        ...(normalizedModule ? { module: normalizedModule } : {}),
       };
 
       const response = await fetch(commentsEndpoint, {
