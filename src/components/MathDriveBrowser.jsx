@@ -624,10 +624,11 @@ const MathDriveBrowser = () => {
               </div>
             </div>
           </div>
+        </div>
         )}
-      </Card>
-    </div>
-  );
-};
+        </Card>
+      </div>
+    );
+  };
 
 export default MathDriveBrowser;

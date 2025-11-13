@@ -29,7 +29,6 @@ const CommentsPanel = ({
   title = "Comments & Discussion",
   description = "Ask questions or share your thoughts",
   embedded = false,
-  module,
   className,
 }) => {
   const { toast } = useToast();
